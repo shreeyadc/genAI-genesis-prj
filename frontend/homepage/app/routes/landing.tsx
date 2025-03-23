@@ -69,7 +69,19 @@ export default function VoiceJournal() {
     emotion: Emotion;
   } | null>(null);
 
-  // Initialize speech recognition
+  // Add useEffect to update pendingEntry when transcript or emotion changes
+  useEffect(() => {
+    if (transcript) {
+      setPendingEntry({
+        transcript,
+        emotion: currentEmotion
+      });
+    } else {
+      setPendingEntry(null);
+    }
+  }, [transcript, currentEmotion]);
+
+  // Modify the speech recognition onresult handler to update transcript
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (SpeechRecognition) {
@@ -85,8 +97,6 @@ export default function VoiceJournal() {
           const transcript = event.results[i][0].transcript
           if (event.results[i].isFinal) {
             finalTranscript += transcript
-            //console.log('API input:', finalTranscript);
-            // Send final transcript to API
             try {
               const response = await fetch('http://127.0.0.1:5000/input', {
                 method: 'POST',
@@ -103,26 +113,22 @@ export default function VoiceJournal() {
               const data = await response.json();
               console.log('API Response:', data);
               
-              // Update emotion based on API response if available
               if (data.text) {
-                //detectEmotion(data.text);
-                setCurrentEmotion(data.text)
-                // setCurrentEmotion(data.text.toLowerCase() as Emotion);
+                setCurrentEmotion(data.text);
               }
             } catch (error) {
               console.error('Error sending transcript to API:', error);
-              // Fallback to local emotion detection if API fails
-              // detectEmotion(finalTranscript);
             }
           } else {
             interimTranscript += transcript
           }
         }
 
+        // Update transcript state with either final or interim transcript
         setTranscript(finalTranscript || interimTranscript)
       }
     }
-  }, [])
+  }, []) // Empty dependency array since we only want to set this up once
 
   // Generate calendar days whenever month or journal entries change
   useEffect(() => {
@@ -291,12 +297,6 @@ export default function VoiceJournal() {
 
       // Handle recording stop
       mediaRecorder.onstop = () => {
-        // Store the pending entry without audio
-        setPendingEntry({
-          transcript,
-          emotion: currentEmotion
-        });
-
         // Stop recording-related activities
         if (recognitionRef.current) {
           recognitionRef.current.stop();
@@ -476,26 +476,6 @@ export default function VoiceJournal() {
     }
   }
 
-  // Get emotion background color
-  const getEmotionBgColor = (emotion: Emotion) => {
-    switch (emotion) {
-      case "love":
-        return "bg-pink-100"
-      case "pride":
-        return "bg-gradient-to-r from-red-100 via-yellow-100 to-violet-100"
-      case "happy":
-        return "bg-yellow-100"
-      case "sad":
-        return "bg-blue-100"
-      case "angry":
-        return "bg-red-100"
-      case "excited":
-        return "bg-purple-100"
-      default:
-        return "bg-gray-100"
-    }
-  }
-
   // Get affirmation based on emotion
   const getAffirmation = (emotion: Emotion) => {
     const affirmations = {
@@ -611,8 +591,10 @@ export default function VoiceJournal() {
       // Create entry object without audio
       const newEntry = {
         date: (selectedDay || new Date()).toISOString(),
-        transcript: pendingEntry.transcript,
-        emotion: pendingEntry.emotion
+        // transcript: pendingEntry.transcript,
+        transcript: transcript,
+        // emotion: pendingEntry.emotion
+        emotion: currentEmotion
       };
 
       const response = await fetch('http://127.0.0.1:5000/save_entry', {
@@ -846,12 +828,12 @@ export default function VoiceJournal() {
                     <div
                       key={index}
                       className={`
-            text-center p-0.5 rounded-sm cursor-pointer text-xs
-            ${day.isCurrentMonth ? "font-medium" : "text-muted-foreground"}
-            ${day.hasEntry ? getEmotionColor(day.emotion || "neutral") : "hover:bg-muted"}
-            ${selectedDay && day.date.toDateString() === selectedDay.toDateString() ? "ring-2 ring-primary" : ""}
-}
-          `}
+                          text-center p-0.5 rounded-sm cursor-pointer text-xs
+                          ${day.isCurrentMonth ? "font-medium" : "text-muted-foreground"}
+                          ${day.hasEntry ? getEmotionColor(day.emotion || "neutral") : "hover:bg-muted"}
+                          ${selectedDay && day.date.toDateString() === selectedDay.toDateString() ? "ring-2 ring-primary" : ""}
+              }
+                        `}
                       onClick={() => handleDayClick(day)}
                     >
                       {day.date.getDate()}
