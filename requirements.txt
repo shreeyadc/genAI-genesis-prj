@@ -2,3 +2,5 @@ pyaudio
 google-cloud-speech
 flask
 gradio-client
+websockets==10.3
+Flask-CORS==3.1.1
