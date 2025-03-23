@@ -3,10 +3,11 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "../components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
-import { Mic, MicOff, Clock, Calendar, ChevronLeft, ChevronRight, Quote } from "lucide-react"
+import { Mic, MicOff, Clock, Calendar, ChevronLeft, ChevronRight, Quote, Image as ImageIcon } from "lucide-react"
+// import { BlobBackground } from "../components/ui/bg"
 
 // Emotion types
-type Emotion = "neutral" | "happy" | "sad" | "angry" | "excited"
+type Emotion = "neutral" | "happy" | "sad" | "angry" | "excited" | "love" | "pride"
 
 // Journal entry type
 interface JournalEntry {
@@ -14,7 +15,6 @@ interface JournalEntry {
   date: Date
   transcript: string
   emotion: Emotion
-  audioUrl?: string
 }
 
 // Calendar day type
@@ -48,6 +48,9 @@ export default function VoiceJournal() {
   // State to store the selected date
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
+  // State for image generation
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false)
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null)
 
   // Refs for recording
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -56,6 +59,15 @@ export default function VoiceJournal() {
 
   // Ref for speech recognition
   const recognitionRef = useRef<any>(null)
+
+  // Add loading state
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Add near the top with other state declarations
+  const [pendingEntry, setPendingEntry] = useState<{
+    transcript: string;
+    emotion: Emotion;
+  } | null>(null);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -93,7 +105,8 @@ export default function VoiceJournal() {
               
               // Update emotion based on API response if available
               if (data.text) {
-                detectEmotion(data.text);
+                //detectEmotion(data.text);
+                setCurrentEmotion(data.text)
                 // setCurrentEmotion(data.text.toLowerCase() as Emotion);
               }
             } catch (error) {
@@ -220,38 +233,50 @@ export default function VoiceJournal() {
   };
   
 
-  // Simple emotion detection based on keywords
-  const detectEmotion = (text: string) => {
-    const lowerText = text.toLowerCase()
+  // // Simple emotion detection based on keywords
+  // const detectEmotion = (text: string) => {
+  //   const lowerText = text.toLowerCase()
 
-    if (
-      lowerText.includes("happy") ||
-      lowerText.includes("joy") ||
-      lowerText.includes("great") ||
-      lowerText.includes("awesome")
-    ) {
-      setCurrentEmotion("happy")
-    } else if (lowerText.includes("sad") || lowerText.includes("upset") || lowerText.includes("depressed")) {
-      setCurrentEmotion("sad")
-    } else if (lowerText.includes("angry") || lowerText.includes("mad") || lowerText.includes("frustrated")) {
-      setCurrentEmotion("angry")
-    } else if (lowerText.includes("excited") || lowerText.includes("thrilled") || lowerText.includes("amazing")) {
-      setCurrentEmotion("excited")
-    } else {
-      setCurrentEmotion("neutral")
-    }
-  }
+  //   if (
+  //     lowerText.includes("love") ||
+  //     lowerText.includes("adore") ||
+  //     lowerText.includes("cherish") ||
+  //     lowerText.includes("heart")
+  //   ) {
+  //     setCurrentEmotion("love")
+  //   } else if (
+  //     lowerText.includes("pride") ||
+  //     lowerText.includes("proud") ||
+  //     lowerText.includes("accomplished") ||
+  //     lowerText.includes("achievement")
+  //   ) {
+  //     setCurrentEmotion("pride")
+  //   } else if (
+  //     lowerText.includes("happy") ||
+  //     lowerText.includes("joy") ||
+  //     lowerText.includes("great") ||
+  //     lowerText.includes("awesome")
+  //   ) {
+  //     setCurrentEmotion("happy")
+  //   } else if (lowerText.includes("sad") || lowerText.includes("upset") || lowerText.includes("depressed")) {
+  //     setCurrentEmotion("sad")
+  //   } else if (lowerText.includes("angry") || lowerText.includes("mad") || lowerText.includes("frustrated")) {
+  //     setCurrentEmotion("angry")
+  //   } else if (lowerText.includes("excited") || lowerText.includes("thrilled") || lowerText.includes("amazing")) {
+  //     setCurrentEmotion("excited")
+  //   } else {
+  //     setCurrentEmotion("neutral")
+  //   }
+  // }
 
   // Start recording
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
 
-      // Reset state
+      // Reset state except transcript
       audioChunksRef.current = []
-      setTranscript("")
       setRecordingTime(0)
-      setCurrentEmotion("neutral")
 
       // Create media recorder
       const mediaRecorder = new MediaRecorder(stream)
@@ -266,25 +291,17 @@ export default function VoiceJournal() {
 
       // Handle recording stop
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" })
-        const audioUrl = URL.createObjectURL(audioBlob)
+        // Store the pending entry without audio
+        setPendingEntry({
+          transcript,
+          emotion: currentEmotion
+        });
 
-        // Create new journal entry
-        const newEntry: JournalEntry = {
-          id: Date.now().toString(),
-          date: selectedDay || new Date(),
-          transcript: transcript,
-          emotion: currentEmotion,
-          audioUrl: audioUrl,
+        // Stop recording-related activities
+        if (recognitionRef.current) {
+          recognitionRef.current.stop();
         }
-
-        // Add to journal entries
-        setJournalEntries((prev) => [newEntry, ...prev])
-
-        // Reset state
-        setTranscript("")
-        setRecordingTime(0)
-        setCurrentEmotion("neutral")
+        setIsRecording(false);
       }
 
       // Start recording
@@ -358,6 +375,24 @@ export default function VoiceJournal() {
   // Get animation properties based on emotion
   const getEmotionAnimationProps = (emotion: Emotion) => {
     switch (emotion) {
+      case "love":
+        return {
+          backgroundColor: "bg-pink-50",
+          circleColor: "bg-pink-300",
+          squareColor: "bg-pink-400",
+          triangleColor: "border-pink-500",
+          animationSpeed: "animate-pulse",
+          specialAnimation: "love-animation",
+        }
+      case "pride":
+        return {
+          backgroundColor: "bg-gradient-to-r from-red-50 via-yellow-50 to-violet-50",
+          circleColor: "bg-gradient-to-r from-red-300 via-yellow-300 to-violet-300",
+          squareColor: "bg-gradient-to-r from-orange-400 via-green-400 to-blue-400",
+          triangleColor: "border-indigo-500",
+          animationSpeed: "animate-bounce",
+          specialAnimation: "pride-animation",
+        }
       case "happy":
         return {
           backgroundColor: "bg-yellow-50",
@@ -404,6 +439,10 @@ export default function VoiceJournal() {
   // Get emotion label
   const getEmotionLabel = (emotion: Emotion) => {
     switch (emotion) {
+      case "love":
+        return "Love"
+      case "pride":
+        return "Pride"
       case "happy":
         return "Happy"
       case "sad":
@@ -420,6 +459,10 @@ export default function VoiceJournal() {
   // Get emotion color
   const getEmotionColor = (emotion: Emotion) => {
     switch (emotion) {
+      case "love":
+        return "text-pink-500"
+      case "pride":
+        return "text-indigo-500"
       case "happy":
         return "text-yellow-500"
       case "sad":
@@ -436,6 +479,10 @@ export default function VoiceJournal() {
   // Get emotion background color
   const getEmotionBgColor = (emotion: Emotion) => {
     switch (emotion) {
+      case "love":
+        return "bg-pink-100"
+      case "pride":
+        return "bg-gradient-to-r from-red-100 via-yellow-100 to-violet-100"
       case "happy":
         return "bg-yellow-100"
       case "sad":
@@ -452,6 +499,16 @@ export default function VoiceJournal() {
   // Get affirmation based on emotion
   const getAffirmation = (emotion: Emotion) => {
     const affirmations = {
+      love: [
+        "Love is the most powerful force in the universe.",
+        "Your capacity to love makes the world a better place.",
+        "The love you give returns to you in unexpected ways.",
+      ],
+      pride: [
+        "Be proud of who you are and all you've accomplished.",
+        "Your uniqueness is your strength. Celebrate it!",
+        "You have every right to stand tall and be proud of yourself.",
+      ],
       happy: [
         "Your joy is contagious. Keep spreading it!",
         "Happiness looks beautiful on you.",
@@ -487,229 +544,377 @@ export default function VoiceJournal() {
   const emotionProps = getEmotionAnimationProps(currentEmotion)
   const selectedEntry = journalEntries.find((entry) => entry.id === selectedEntryId)
 
+  // Generate image
+  const generateImage = async () => {
+    if (!transcript) return;
+    
+    setIsGeneratingImage(true);
+    try {
+      console.log('Sending request to generate image for:', transcript);
+      
+      const response = await fetch('http://127.0.0.1:5000/image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: transcript }),
+      });
+
+      if (!response.ok) throw new Error('Image generation failed');
+
+      console.log('Response received:', response);
+      const blob = await response.blob();
+      console.log('Image blob:', blob);
+      
+      const imageUrl = URL.createObjectURL(blob);
+      console.log('Generated image URL:', imageUrl);
+      
+      setGeneratedImage(imageUrl);
+    } catch (error) {
+      console.error('Error generating image:', error);
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
+  // Load entries on component mount
+  useEffect(() => {
+    loadEntries();
+  }, []);
+
+  // Function to load entries
+  const loadEntries = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('http://127.0.0.1:5000/get_entries');
+      if (!response.ok) throw new Error('Failed to load entries');
+      
+      const entries = await response.json();
+      setJournalEntries(entries.map((entry: any) => ({
+        id: entry.id.toString(),
+        date: new Date(entry.date),
+        transcript: entry.transcript,
+        emotion: entry.emotion as Emotion
+      })));
+    } catch (error) {
+      console.error('Error loading entries:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add this new function after other function declarations
+  const handleSubmitEntry = async () => {
+    if (!pendingEntry) return;
+    
+    try {
+      // Create entry object without audio
+      const newEntry = {
+        date: (selectedDay || new Date()).toISOString(),
+        transcript: pendingEntry.transcript,
+        emotion: pendingEntry.emotion
+      };
+
+      const response = await fetch('http://127.0.0.1:5000/save_entry', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newEntry),
+      });
+
+      if (!response.ok) throw new Error('Failed to save entry');
+
+      // Reload entries and reset states
+      await loadEntries();
+      setPendingEntry(null);
+      setTranscript("");
+      setCurrentEmotion("neutral");
+      
+    } catch (error) {
+      console.error('Error saving entry:', error);
+    }
+  };
+
   return (
-    <div className={`min-h-screen flex flex-col ${emotionProps.backgroundColor} transition-colors duration-500`}>
-      {/* Animated background */}
-      <div className="fixed inset-0 -z-10 overflow-hidden">
-        {/* Larger, more prominent shapes */}
-        <div
-          className={`absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full ${emotionProps.circleColor} opacity-30 ${emotionProps.animationSpeed} transition-all duration-1000`}
-        />
-        <div
-          className={`absolute top-2/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 ${emotionProps.squareColor} opacity-30 rotate-45 ${emotionProps.animationSpeed} delay-100 transition-all duration-1000`}
-        />
-        <div
-          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-0 h-0 border-l-[60px] border-r-[60px] border-b-[100px] ${emotionProps.triangleColor} border-l-transparent border-r-transparent opacity-30 ${emotionProps.animationSpeed} delay-200 transition-all duration-1000`}
-        />
+    <>
+      {/* <BlobBackground emotion={currentEmotion} /> */}
+      <div className={`min-h-screen flex flex-col ${emotionProps.backgroundColor} transition-colors duration-500`}>
+        {/* Animated background */}
+        <div className="fixed inset-0 -z-10 overflow-hidden">
+          {/* Larger, more prominent shapes */}
+          <div
+            className={`absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full ${emotionProps.circleColor} opacity-30 ${emotionProps.animationSpeed} transition-all duration-1000`}
+          />
+          <div
+            className={`absolute top-2/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 ${emotionProps.squareColor} opacity-30 rotate-45 ${emotionProps.animationSpeed} delay-100 transition-all duration-1000`}
+          />
+          <div
+            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-0 h-0 border-l-[60px] border-r-[60px] border-b-[100px] ${emotionProps.triangleColor} border-l-transparent border-r-transparent opacity-30 ${emotionProps.animationSpeed} delay-200 transition-all duration-1000`}
+          />
 
-        {/* Additional background shapes */}
-        <div
-          className={`absolute top-1/4 left-1/4 w-32 h-32 rounded-full ${emotionProps.circleColor} opacity-20 ${emotionProps.animationSpeed} delay-300`}
-        />
-        <div
-          className={`absolute bottom-1/4 right-1/4 w-40 h-40 rounded-full ${emotionProps.circleColor} opacity-20 ${emotionProps.animationSpeed} delay-150`}
-        />
-        <div
-          className={`absolute top-1/3 right-1/3 w-24 h-24 ${emotionProps.squareColor} opacity-20 rotate-12 ${emotionProps.animationSpeed} delay-75`}
-        />
-      </div>
+          {/* Additional background shapes */}
+          <div
+            className={`absolute top-1/4 left-1/4 w-32 h-32 rounded-full ${emotionProps.circleColor} opacity-20 ${emotionProps.animationSpeed} delay-300`}
+          />
+          <div
+            className={`absolute bottom-1/4 right-1/4 w-40 h-40 rounded-full ${emotionProps.circleColor} opacity-20 ${emotionProps.animationSpeed} delay-150`}
+          />
+          <div
+            className={`absolute top-1/3 right-1/3 w-24 h-24 ${emotionProps.squareColor} opacity-20 rotate-12 ${emotionProps.animationSpeed} delay-75`}
+          />
+          {currentEmotion === "love" && (
+            <>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="love-heart"></div>
+              </div>
+              <div className="absolute top-1/4 left-1/3 love-heart scale-50 opacity-30"></div>
+              <div className="absolute bottom-1/4 right-1/3 love-heart scale-75 opacity-40"></div>
+            </>
+          )}
 
-      <header className="p-4 border-b">
-        <h1 className="text-2xl font-bold text-center">Voice Journal</h1>
-      </header>
+          {/* Special animations for pride */}
+          {currentEmotion === "pride" && <div className="pride-rainbow absolute inset-x-0 top-10 h-40 opacity-30"></div>}
+        </div>
 
-      <main className="flex-1 flex flex-col md:flex-row p-4 gap-4">
-        {/* Left side - Recording controls */}
-        <div className="w-full md:w-1/4 lg:w-1/5 flex flex-col items-center justify-start gap-6 p-4 bg-background/80 backdrop-blur-sm rounded-lg">
-          <div className="text-center mb-2">
-            <h2 className="text-sm font-semibold mb-1">Record Journal</h2>
-            <p className="text-xs text-muted-foreground">Press to start recording</p>
-          </div>
+        <header className="p-4 border-b">
+          <h1 className="text-2xl font-bold text-center">Voice Journal</h1>
+        </header>
 
-          <div className="relative">
-            <Button
-              size="lg"
-              className={`rounded-full w-16 h-16 ${isRecording ? "bg-red-500 hover:bg-red-600" : "bg-primary"}`}
-              onClick={isRecording ? stopRecording : startRecording}
-            >
-              {isRecording ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
-            </Button>
-            {isRecording && (
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-              </span>
+        <main className="flex-1 flex flex-col md:flex-row p-4 gap-4">
+          {/* Left side - Recording controls */}
+          <div className="w-full md:w-1/4 lg:w-1/5 flex flex-col items-center justify-start gap-6 p-4 bg-background/80 backdrop-blur-sm rounded-lg">
+            <div className="text-center mb-2">
+              <h2 className="text-sm font-semibold mb-1">Record Journal</h2>
+              <p className="text-xs text-muted-foreground">Press to start recording</p>
+            </div>
+
+            <div className="relative">
+              <Button
+                size="lg"
+                className={`rounded-full w-16 h-16 ${isRecording ? "bg-red-500 hover:bg-red-600" : "bg-primary"}`}
+                onClick={isRecording ? stopRecording : startRecording}
+              >
+                {isRecording ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+              </Button>
+              {isRecording && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                </span>
+              )}
+            </div>
+
+            <div className="mt-2 text-center w-full">
+              {isRecording && (
+                <div className="flex items-center justify-center gap-1 text-red-500">
+                  <Clock className="h-3 w-3" />
+                  <span className="text-xs">{formatTime(recordingTime)}</span>
+                </div>
+              )}
+              
+              {/* Transcript box - now outside isRecording condition */}
+              {transcript && (
+                <div className="mt-2 p-2 border rounded-md max-w-md">
+                  <p className="text-xs text-muted-foreground">Current transcript:</p>
+                  <p className="mt-1 text-xs line-clamp-3">{transcript || "Speak to see your words here..."}</p>
+                </div>
+              )}
+              
+              {/* Emotion display - also show when there's a transcript */}
+              {transcript && (
+                <div className="mt-2">
+                  <p className="text-xs text-muted-foreground">Detected emotion:</p>
+                  <p className={`text-xs font-medium ${getEmotionColor(currentEmotion)}`}>
+                    {getEmotionLabel(currentEmotion)}
+                  </p>
+                </div>
+              )}
+
+              {transcript && !isRecording && (
+                <div className="mt-4">
+                  <Button 
+                    onClick={handleSubmitEntry}
+                    className="w-full"
+                    disabled={!pendingEntry}
+                  >
+                    Submit Journal Entry
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Affirmation Box */}
+            <Card className="w-full mt-4">
+              <CardHeader className="pb-1 pt-3">
+                <div className="flex items-center gap-1">
+                  <Quote className="h-4 w-4 text-primary" />
+                  <CardTitle className="text-sm">Affirmation</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="py-2">
+                <div className="p-2 rounded-lg bg-primary/10 text-center">
+                  <p className="italic text-xs">{getAffirmation(currentEmotion)}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Image generation button */}
+            {transcript && (
+              <div className="w-full flex flex-col items-center gap-2">
+                <Button 
+                  onClick={generateImage}
+                  disabled={isGeneratingImage}
+                  className="flex items-center gap-2"
+                >
+                  <ImageIcon className="h-4 w-4" />
+                  {isGeneratingImage ? 'Generating...' : 'Generate Image'}
+                </Button>
+                
+                {generatedImage && (
+                  <div className="mt-2 w-full">
+                    <img 
+                      src={generatedImage} 
+                      alt="Generated visualization"
+                      className="w-full rounded-lg shadow-md" 
+                    />
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
-          {isRecording && (
-            <div className="mt-2 text-center w-full">
-              <div className="flex items-center justify-center gap-1 text-red-500">
-                <Clock className="h-3 w-3" />
-                <span className="text-xs">{formatTime(recordingTime)}</span>
-              </div>
-              <div className="mt-2 p-2 border rounded-md max-w-md">
-                <p className="text-xs text-muted-foreground">Current transcript:</p>
-                <p className="mt-1 text-xs line-clamp-3">{transcript || "Speak to see your words here..."}</p>
-              </div>
-              <div className="mt-2">
-                <p className="text-xs text-muted-foreground">Detected emotion:</p>
-                <p className={`text-xs font-medium ${getEmotionColor(currentEmotion)}`}>
-                  {getEmotionLabel(currentEmotion)}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Affirmation Box */}
-          <Card className="w-full mt-4">
-            <CardHeader className="pb-1 pt-3">
-              <div className="flex items-center gap-1">
-                <Quote className="h-4 w-4 text-primary" />
-                <CardTitle className="text-sm">Affirmation</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="py-2">
-              <div className="p-2 rounded-lg bg-primary/10 text-center">
-                <p className="italic text-xs">{getAffirmation(currentEmotion)}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Center area - Enhanced animations */}
-        <div className="hidden md:flex flex-1 items-center justify-center relative">
-          {/* Enhanced central animations will go here */}
-          <div className="text-center p-6 rounded-lg bg-background/30 backdrop-blur-sm">
-            <h2 className="text-2xl font-bold mb-2">Your Emotional Journey</h2>
-            <p className="text-muted-foreground mb-4">Speak to see your emotions visualized</p>
-            <div className="relative h-64 w-64 mx-auto">
-              {/* Enhanced emotion visualizations */}
-              <div
-                className={`absolute inset-0 rounded-full ${emotionProps.circleColor} opacity-40 ${emotionProps.animationSpeed} transition-all duration-1000 ease-in-out`}
-              ></div>
-              <div
-                className={`absolute inset-8 rotate-45 ${emotionProps.squareColor} opacity-40 ${emotionProps.animationSpeed} delay-100 transition-all duration-1000 ease-in-out`}
-              ></div>
-              <div
-                className={`absolute inset-16 rounded-full ${emotionProps.circleColor} opacity-40 ${emotionProps.animationSpeed} delay-200 transition-all duration-1000 ease-in-out`}
-              ></div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className={`text-4xl font-bold ${getEmotionColor(currentEmotion)}`}>
-                  {getEmotionLabel(currentEmotion)}
-                </span>
+          {/* Center area - Enhanced animations */}
+          <div className="hidden md:flex flex-1 items-center justify-center relative">
+            {/* Enhanced central animations will go here */}
+            <div className="text-center p-6 rounded-lg bg-background/30 backdrop-blur-sm">
+              <h2 className="text-2xl font-bold mb-2">Your Emotional Journey</h2>
+              <p className="text-muted-foreground mb-4">Speak to see your emotions visualized</p>
+              <div className="relative h-64 w-64 mx-auto">
+                {/* Enhanced emotion visualizations */}
+                <div
+                  className={`absolute inset-0 rounded-full ${emotionProps.circleColor} opacity-40 ${emotionProps.animationSpeed} transition-all duration-1000 ease-in-out`}
+                ></div>
+                <div
+                  className={`absolute inset-8 rotate-45 ${emotionProps.squareColor} opacity-40 ${emotionProps.animationSpeed} delay-100 transition-all duration-1000 ease-in-out`}
+                ></div>
+                <div
+                  className={`absolute inset-16 rounded-full ${emotionProps.circleColor} opacity-40 ${emotionProps.animationSpeed} delay-200 transition-all duration-1000 ease-in-out`}
+                ></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className={`text-4xl font-bold ${getEmotionColor(currentEmotion)}`}>
+                    {getEmotionLabel(currentEmotion)}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Right side - Calendar and Journal log */}
-        <div className="w-full md:w-1/4 lg:w-1/5 p-4 bg-background/80 backdrop-blur-sm rounded-lg">
-          {/* Calendar */}
-          <Card className="mb-4">
-            <CardHeader className="pb-1 pt-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
-                  Calendar
-                </CardTitle>
-                <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={goToPrevMonth}>
-                    <ChevronLeft className="h-3 w-3" />
-                  </Button>
-                  <span className="text-xs font-medium">{formatMonth(currentMonth)}</span>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={goToNextMonth}>
-                    <ChevronRight className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="px-2 py-1">
-              {/* Calendar grid */}
-              <div className="grid grid-cols-7 gap-0.5 text-xs">
-                {/* Day headers */}
-                {["S", "M", "T", "W", "T", "F", "S"].map((day) => (
-                  <div key={day} className="text-center font-medium py-0.5">
-                    {day}
+          {/* Right side - Calendar and Journal log */}
+          <div className="w-full md:w-1/4 lg:w-1/5 p-4 bg-background/80 backdrop-blur-sm rounded-lg">
+            {/* Calendar */}
+            <Card className="mb-4">
+              <CardHeader className="pb-1 pt-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm flex items-center gap-1">
+                    <Calendar className="h-4 w-4" />
+                    Calendar
+                  </CardTitle>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={goToPrevMonth}>
+                      <ChevronLeft className="h-3 w-3" />
+                    </Button>
+                    <span className="text-xs font-medium">{formatMonth(currentMonth)}</span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={goToNextMonth}>
+                      <ChevronRight className="h-3 w-3" />
+                    </Button>
                   </div>
-                ))}
+                </div>
+              </CardHeader>
+              <CardContent className="px-2 py-1">
+                {/* Calendar grid */}
+                <div className="grid grid-cols-7 gap-0.5 text-xs">
+                  {/* Day headers */}
+                  {["S", "M", "T", "W", "T", "F", "S"].map((day) => (
+                    <div key={day} className="text-center font-medium py-0.5">
+                      {day}
+                    </div>
+                  ))}
 
-                {/* Calendar days */}
-                {calendarDays.map((day, index) => (
-                  <div
-                    key={index}
-                    className={`
+                  {/* Calendar days */}
+                  {calendarDays.map((day, index) => (
+                    <div
+                      key={index}
+                      className={`
             text-center p-0.5 rounded-sm cursor-pointer text-xs
             ${day.isCurrentMonth ? "font-medium" : "text-muted-foreground"}
-            ${day.hasEntry ? getEmotionBgColor(day.emotion || "neutral") : "hover:bg-muted"}
+            ${day.hasEntry ? getEmotionColor(day.emotion || "neutral") : "hover:bg-muted"}
             ${selectedDay && day.date.toDateString() === selectedDay.toDateString() ? "ring-2 ring-primary" : ""}
 }
           `}
-                    onClick={() => handleDayClick(day)}
-                  >
-                    {day.date.getDate()}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Journal Entries */}
-          <h2 className="text-sm font-semibold mb-2 mt-4">Journal Entries</h2>
-
-          {journalEntries.length === 0 ? (
-            <div className="text-center p-2 border rounded-md">
-              <p className="text-xs text-muted-foreground">No entries yet</p>
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-[calc(100vh-350px)] overflow-y-auto pr-1">
-              {/* Selected entry */}
-              {selectedEntry && (
-                <Card key={selectedEntry.id} className="border-primary">
-                  <CardHeader className="pb-1 pt-2">
-                    <div className="flex justify-between items-center">
-                      <CardTitle className="text-xs font-medium">{formatDate(selectedEntry.date)}</CardTitle>
-                      <span className={`text-xs font-medium ${getEmotionColor(selectedEntry.emotion)}`}>
-                        {getEmotionLabel(selectedEntry.emotion)}
-                      </span>
+                      onClick={() => handleDayClick(day)}
+                    >
+                      {day.date.getDate()}
                     </div>
-                  </CardHeader>
-                  <CardContent className="py-1">
-                    <p className="text-xs line-clamp-2">{selectedEntry.transcript}</p>
-                    {selectedEntry.audioUrl && (
-                      <audio className="mt-1 w-full h-6" controls src={selectedEntry.audioUrl} />
-                    )}
-                  </CardContent>
-                </Card>
-              )}
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
-              {/* Other entries */}
-              {journalEntries
-                .filter((entry) => entry.id !== selectedEntryId)
-                .map((entry) => (
-                  <Card
-                    key={entry.id}
-                    className="hover:bg-muted/50 cursor-pointer"
-                    onClick={() => setSelectedEntryId(entry.id)}
-                  >
+            {/* Journal Entries */}
+            <h2 className="text-sm font-semibold mb-2 mt-4">Journal Entries</h2>
+
+            {journalEntries.length === 0 ? (
+              <div className="text-center p-2 border rounded-md">
+                <p className="text-xs text-muted-foreground">No entries yet</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[calc(100vh-350px)] overflow-y-auto pr-1">
+                {/* Selected entry */}
+                {selectedEntry && (
+                  <Card key={selectedEntry.id} className="border-primary">
                     <CardHeader className="pb-1 pt-2">
                       <div className="flex justify-between items-center">
-                        <CardTitle className="text-xs font-medium">{formatDate(entry.date)}</CardTitle>
-                        <span className={`text-xs font-medium ${getEmotionColor(entry.emotion)}`}>
-                          {getEmotionLabel(entry.emotion)}
+                        <CardTitle className="text-xs font-medium">{formatDate(selectedEntry.date)}</CardTitle>
+                        <span className={`text-xs font-medium ${getEmotionColor(selectedEntry.emotion)}`}>
+                          {getEmotionLabel(selectedEntry.emotion)}
                         </span>
                       </div>
                     </CardHeader>
                     <CardContent className="py-1">
-                      <p className="text-xs line-clamp-2">{entry.transcript}</p>
+                      <p className="text-xs line-clamp-2">{selectedEntry.transcript}</p>
                     </CardContent>
                   </Card>
-                ))}
-            </div>
-          )}
-        </div>
-      </main>
-    </div>
+                )}
+
+                {/* Other entries */}
+                {journalEntries
+                  .filter((entry) => entry.id !== selectedEntryId)
+                  .map((entry) => (
+                    <Card
+                      key={entry.id}
+                      className="hover:bg-muted/50 cursor-pointer"
+                      onClick={() => setSelectedEntryId(entry.id)}
+                    >
+                      <CardHeader className="pb-1 pt-2">
+                        <div className="flex justify-between items-center">
+                          <CardTitle className="text-xs font-medium">{formatDate(entry.date)}</CardTitle>
+                          <span className={`text-xs font-medium ${getEmotionColor(entry.emotion)}`}>
+                            {getEmotionLabel(entry.emotion)}
+                          </span>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="py-1">
+                        <p className="text-xs line-clamp-2">{entry.transcript}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+    </>
   )
 }
 

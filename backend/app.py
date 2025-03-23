@@ -1,6 +1,13 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from gradio_client import Client
+import os
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -13,16 +20,6 @@ def hello_world():
 def greet():
     result = "it is working"
     return result
-
-# @app.get("/input")
-# def read_chat():
-#     return {"message": "GET request received"}
-
-# @app.post("/input")
-# async def chat(message: str):
-#     # For now, just echo back the received message
-#     response = transcribe(message)
-#     return {"message": f"{response}"}
 
 @app.route("/input", methods=["GET"])
 def read_chat():
@@ -40,26 +37,28 @@ def chat():
 def transcribe(user_input):
     return user_input+" test"
 
-# @app.route('/transcribe', methods=['POST'])
-# def transcribe():
-#     try:
-#         data = request.get_json()
-#         transcribed_text = data.get('transcribedText')
-        
-#         if not transcribed_text:
-#             return jsonify({'error': 'Transcribed text is required'}), 400
-            
-#         # Process the transcribed text
-#         processed_text = f"{transcribed_text} backend check"
-        
-#         return jsonify({
-#             'originalText': transcribed_text,
-#             'processedText': processed_text
-#         }), 200
-        
-#     except Exception as e:
-#         print(f"Error processing transcription: {str(e)}")
-#         return jsonify({'error': 'Internal server error'}), 500
+# Define the function
+def get_mood_words(journal_entry):
+
+    prompt = f"""
+    Below is a journal entry. Your job is to read it and return **only the top 3 mood or emotional words** that best match the tone and content of the entry.
+
+    Please choose from this exact list of words only:
+    joyful, happy, cheerful, chipper, amused, upbeat, delighted, thrilled, excited, bubbly, content, satisfied, optimistic, grateful, playful, lively, blissful, exuberant, giddy, jubilant, merry, zestful, sunny, vivacious, laughing, grinning, chuffed, relaxed, calm, peaceful, serene, composed, zen, unruffled, chill, easygoing, comfortable, meditative, mellow, carefree, contented, unperturbed, safe, settled, angry, annoyed, irritated, infuriated, frustrated, enraged, outraged, agitated, hostile, resentful, cross, grumpy, touchy, temperamental, impatient, snappy, sad, melancholy, gloomy, depressed, blue, mournful, heartbroken, morose, sorrowful, wistful, crying, glum, unhappy, hopeless, lonely, low, dejected, anxious, nervous, afraid, scared, fearful, insecure, uneasy, petrified, alarmed, jumpy, tense, jittery, worried, distressed, threatened, panicked, curious, interested, engaged, enthusiastic, inspired, thoughtful, introspective, contemplative, philosophical, fascinated, absorbed, studious, reflective
+
+    Only reply with the 3 best-fitting words from this list, separated by commas.
+
+    Journal Entry:
+    {journal_entry}
+    """
+
+    try:
+        model = genai.GenerativeModel("models/gemini-1.5-pro-latest")
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+        print("Top 3 Moods:", text)
+    except Exception as e:
+        print("Gemini API Error:", str(e))
 
 
 @app.route('/music', methods=['GET'])
