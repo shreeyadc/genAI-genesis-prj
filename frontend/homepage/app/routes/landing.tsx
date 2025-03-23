@@ -26,6 +26,9 @@ interface CalendarDay {
   entryId?: string
 }
 
+// Add API URL constant at the top
+const API_URL = 'http://127.0.0.1:5000';
+
 export default function VoiceJournal() {
   // State for recording
   const [isRecording, setIsRecording] = useState(false)
@@ -56,14 +59,13 @@ export default function VoiceJournal() {
 
   // Initialize speech recognition
   useEffect(() => {
-    // Check if browser supports SpeechRecognition
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (SpeechRecognition) {
       recognitionRef.current = new SpeechRecognition()
       recognitionRef.current.continuous = true
       recognitionRef.current.interimResults = true
 
-      recognitionRef.current.onresult = (event: any) => {
+      recognitionRef.current.onresult = async (event: any) => {
         let interimTranscript = ""
         let finalTranscript = ""
 
@@ -71,16 +73,40 @@ export default function VoiceJournal() {
           const transcript = event.results[i][0].transcript
           if (event.results[i].isFinal) {
             finalTranscript += transcript
+            //console.log('API input:', finalTranscript);
+            // Send final transcript to API
+            try {
+              const response = await fetch('http://127.0.0.1:5000/input', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ text: finalTranscript }),
+              });
+
+              if (!response.ok) {
+                throw new Error('Network response was not ok');
+              }
+
+              const data = await response.json();
+              console.log('API Response:', data);
+              
+              // Update emotion based on API response if available
+              if (data.text) {
+                detectEmotion(data.text);
+                // setCurrentEmotion(data.text.toLowerCase() as Emotion);
+              }
+            } catch (error) {
+              console.error('Error sending transcript to API:', error);
+              // Fallback to local emotion detection if API fails
+              // detectEmotion(finalTranscript);
+            }
           } else {
             interimTranscript += transcript
           }
         }
 
         setTranscript(finalTranscript || interimTranscript)
-
-        // Simple emotion detection based on keywords
-        // In a real app, you would use a more sophisticated sentiment analysis
-        detectEmotion(finalTranscript || interimTranscript)
       }
     }
   }, [])
@@ -688,4 +714,5 @@ export default function VoiceJournal() {
 }
 
 export {VoiceJournal}
+
 
