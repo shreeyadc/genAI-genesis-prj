@@ -15,7 +15,6 @@ interface JournalEntry {
   date: Date
   transcript: string
   emotion: Emotion
-  audioUrl?: string
 }
 
 // Calendar day type
@@ -60,6 +59,15 @@ export default function VoiceJournal() {
 
   // Ref for speech recognition
   const recognitionRef = useRef<any>(null)
+
+  // Add loading state
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Add near the top with other state declarations
+  const [pendingEntry, setPendingEntry] = useState<{
+    transcript: string;
+    emotion: Emotion;
+  } | null>(null);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -266,11 +274,9 @@ export default function VoiceJournal() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
 
-      // Reset state
+      // Reset state except transcript
       audioChunksRef.current = []
-      setTranscript("")
       setRecordingTime(0)
-      setCurrentEmotion("neutral")
 
       // Create media recorder
       const mediaRecorder = new MediaRecorder(stream)
@@ -285,25 +291,17 @@ export default function VoiceJournal() {
 
       // Handle recording stop
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" })
-        const audioUrl = URL.createObjectURL(audioBlob)
+        // Store the pending entry without audio
+        setPendingEntry({
+          transcript,
+          emotion: currentEmotion
+        });
 
-        // Create new journal entry
-        const newEntry: JournalEntry = {
-          id: Date.now().toString(),
-          date: selectedDay || new Date(),
-          transcript: transcript,
-          emotion: currentEmotion,
-          audioUrl: audioUrl,
+        // Stop recording-related activities
+        if (recognitionRef.current) {
+          recognitionRef.current.stop();
         }
-
-        // Add to journal entries
-        setJournalEntries((prev) => [newEntry, ...prev])
-
-        // Reset state
-        setTranscript("")
-        setRecordingTime(0)
-        setCurrentEmotion("neutral")
+        setIsRecording(false);
       }
 
       // Start recording
@@ -552,6 +550,8 @@ export default function VoiceJournal() {
     
     setIsGeneratingImage(true);
     try {
+      console.log('Sending request to generate image for:', transcript);
+      
       const response = await fetch('http://127.0.0.1:5000/image', {
         method: 'POST',
         headers: {
@@ -562,13 +562,77 @@ export default function VoiceJournal() {
 
       if (!response.ok) throw new Error('Image generation failed');
 
+      console.log('Response received:', response);
       const blob = await response.blob();
+      console.log('Image blob:', blob);
+      
       const imageUrl = URL.createObjectURL(blob);
+      console.log('Generated image URL:', imageUrl);
+      
       setGeneratedImage(imageUrl);
     } catch (error) {
       console.error('Error generating image:', error);
     } finally {
       setIsGeneratingImage(false);
+    }
+  };
+
+  // Load entries on component mount
+  useEffect(() => {
+    loadEntries();
+  }, []);
+
+  // Function to load entries
+  const loadEntries = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('http://127.0.0.1:5000/get_entries');
+      if (!response.ok) throw new Error('Failed to load entries');
+      
+      const entries = await response.json();
+      setJournalEntries(entries.map((entry: any) => ({
+        id: entry.id.toString(),
+        date: new Date(entry.date),
+        transcript: entry.transcript,
+        emotion: entry.emotion as Emotion
+      })));
+    } catch (error) {
+      console.error('Error loading entries:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add this new function after other function declarations
+  const handleSubmitEntry = async () => {
+    if (!pendingEntry) return;
+    
+    try {
+      // Create entry object without audio
+      const newEntry = {
+        date: (selectedDay || new Date()).toISOString(),
+        transcript: pendingEntry.transcript,
+        emotion: pendingEntry.emotion
+      };
+
+      const response = await fetch('http://127.0.0.1:5000/save_entry', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newEntry),
+      });
+
+      if (!response.ok) throw new Error('Failed to save entry');
+
+      // Reload entries and reset states
+      await loadEntries();
+      setPendingEntry(null);
+      setTranscript("");
+      setCurrentEmotion("neutral");
+      
+    } catch (error) {
+      console.error('Error saving entry:', error);
     }
   };
 
@@ -641,24 +705,44 @@ export default function VoiceJournal() {
               )}
             </div>
 
-            {isRecording && (
-              <div className="mt-2 text-center w-full">
+            <div className="mt-2 text-center w-full">
+              {isRecording && (
                 <div className="flex items-center justify-center gap-1 text-red-500">
                   <Clock className="h-3 w-3" />
                   <span className="text-xs">{formatTime(recordingTime)}</span>
                 </div>
+              )}
+              
+              {/* Transcript box - now outside isRecording condition */}
+              {transcript && (
                 <div className="mt-2 p-2 border rounded-md max-w-md">
                   <p className="text-xs text-muted-foreground">Current transcript:</p>
                   <p className="mt-1 text-xs line-clamp-3">{transcript || "Speak to see your words here..."}</p>
                 </div>
+              )}
+              
+              {/* Emotion display - also show when there's a transcript */}
+              {transcript && (
                 <div className="mt-2">
                   <p className="text-xs text-muted-foreground">Detected emotion:</p>
                   <p className={`text-xs font-medium ${getEmotionColor(currentEmotion)}`}>
                     {getEmotionLabel(currentEmotion)}
                   </p>
                 </div>
-              </div>
-            )}
+              )}
+
+              {transcript && !isRecording && (
+                <div className="mt-4">
+                  <Button 
+                    onClick={handleSubmitEntry}
+                    className="w-full"
+                    disabled={!pendingEntry}
+                  >
+                    Submit Journal Entry
+                  </Button>
+                </div>
+              )}
+            </div>
 
             {/* Affirmation Box */}
             <Card className="w-full mt-4">
@@ -764,7 +848,7 @@ export default function VoiceJournal() {
                       className={`
             text-center p-0.5 rounded-sm cursor-pointer text-xs
             ${day.isCurrentMonth ? "font-medium" : "text-muted-foreground"}
-            ${day.hasEntry ? getEmotionBgColor(day.emotion || "neutral") : "hover:bg-muted"}
+            ${day.hasEntry ? getEmotionColor(day.emotion || "neutral") : "hover:bg-muted"}
             ${selectedDay && day.date.toDateString() === selectedDay.toDateString() ? "ring-2 ring-primary" : ""}
 }
           `}
@@ -799,9 +883,6 @@ export default function VoiceJournal() {
                     </CardHeader>
                     <CardContent className="py-1">
                       <p className="text-xs line-clamp-2">{selectedEntry.transcript}</p>
-                      {selectedEntry.audioUrl && (
-                        <audio className="mt-1 w-full h-6" controls src={selectedEntry.audioUrl} />
-                      )}
                     </CardContent>
                   </Card>
                 )}
