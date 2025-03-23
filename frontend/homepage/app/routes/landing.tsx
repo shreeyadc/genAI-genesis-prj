@@ -42,6 +42,9 @@ export default function VoiceJournal() {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([])
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
+  // State to store the selected date
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+
 
   // Refs for recording
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -184,9 +187,12 @@ export default function VoiceJournal() {
   // Handle calendar day click
   const handleDayClick = (day: CalendarDay) => {
     if (day.hasEntry && day.entryId) {
-      setSelectedEntryId(day.entryId)
+      setSelectedEntryId(day.entryId);
     }
-  }
+    // Set the selected day when a day is clicked
+    setSelectedDay(day.date);
+  };
+  
 
   // Simple emotion detection based on keywords
   const detectEmotion = (text: string) => {
@@ -240,7 +246,7 @@ export default function VoiceJournal() {
         // Create new journal entry
         const newEntry: JournalEntry = {
           id: Date.now().toString(),
-          date: new Date(),
+          date: selectedDay || new Date(),
           transcript: transcript,
           emotion: currentEmotion,
           audioUrl: audioUrl,
@@ -610,7 +616,8 @@ export default function VoiceJournal() {
             text-center p-0.5 rounded-sm cursor-pointer text-xs
             ${day.isCurrentMonth ? "font-medium" : "text-muted-foreground"}
             ${day.hasEntry ? getEmotionBgColor(day.emotion || "neutral") : "hover:bg-muted"}
-            ${selectedEntryId === day.entryId ? "ring-1 ring-primary" : ""}
+            ${selectedDay && day.date.toDateString() === selectedDay.toDateString() ? "ring-2 ring-primary" : ""}
+}
           `}
                     onClick={() => handleDayClick(day)}
                   >
