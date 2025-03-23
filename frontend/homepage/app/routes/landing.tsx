@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Mic, MicOff, Clock, Calendar, ChevronLeft, ChevronRight, Quote } from "lucide-react"
 
 // Emotion types
-type Emotion = "neutral" | "happy" | "sad" | "angry" | "excited"
+type Emotion = "neutral" | "happy" | "sad" | "angry" | "excited" | "love" | "pride"
 
 // Journal entry type
 interface JournalEntry {
@@ -225,6 +225,20 @@ export default function VoiceJournal() {
     const lowerText = text.toLowerCase()
 
     if (
+      lowerText.includes("love") ||
+      lowerText.includes("adore") ||
+      lowerText.includes("cherish") ||
+      lowerText.includes("heart")
+    ) {
+      setCurrentEmotion("love")
+    } else if (
+      lowerText.includes("pride") ||
+      lowerText.includes("proud") ||
+      lowerText.includes("accomplished") ||
+      lowerText.includes("achievement")
+    ) {
+      setCurrentEmotion("pride")
+    } else if (
       lowerText.includes("happy") ||
       lowerText.includes("joy") ||
       lowerText.includes("great") ||
@@ -358,6 +372,24 @@ export default function VoiceJournal() {
   // Get animation properties based on emotion
   const getEmotionAnimationProps = (emotion: Emotion) => {
     switch (emotion) {
+      case "love":
+        return {
+          backgroundColor: "bg-pink-50",
+          circleColor: "bg-pink-300",
+          squareColor: "bg-pink-400",
+          triangleColor: "border-pink-500",
+          animationSpeed: "animate-pulse",
+          specialAnimation: "love-animation",
+        }
+      case "pride":
+        return {
+          backgroundColor: "bg-gradient-to-r from-red-50 via-yellow-50 to-violet-50",
+          circleColor: "bg-gradient-to-r from-red-300 via-yellow-300 to-violet-300",
+          squareColor: "bg-gradient-to-r from-orange-400 via-green-400 to-blue-400",
+          triangleColor: "border-indigo-500",
+          animationSpeed: "animate-bounce",
+          specialAnimation: "pride-animation",
+        }
       case "happy":
         return {
           backgroundColor: "bg-yellow-50",
@@ -404,6 +436,10 @@ export default function VoiceJournal() {
   // Get emotion label
   const getEmotionLabel = (emotion: Emotion) => {
     switch (emotion) {
+      case "love":
+        return "Love"
+      case "pride":
+        return "Pride"
       case "happy":
         return "Happy"
       case "sad":
@@ -420,6 +456,10 @@ export default function VoiceJournal() {
   // Get emotion color
   const getEmotionColor = (emotion: Emotion) => {
     switch (emotion) {
+      case "love":
+        return "text-pink-500"
+      case "pride":
+        return "text-indigo-500"
       case "happy":
         return "text-yellow-500"
       case "sad":
@@ -436,6 +476,10 @@ export default function VoiceJournal() {
   // Get emotion background color
   const getEmotionBgColor = (emotion: Emotion) => {
     switch (emotion) {
+      case "love":
+        return "bg-pink-100"
+      case "pride":
+        return "bg-gradient-to-r from-red-100 via-yellow-100 to-violet-100"
       case "happy":
         return "bg-yellow-100"
       case "sad":
@@ -452,6 +496,16 @@ export default function VoiceJournal() {
   // Get affirmation based on emotion
   const getAffirmation = (emotion: Emotion) => {
     const affirmations = {
+      love: [
+        "Love is the most powerful force in the universe.",
+        "Your capacity to love makes the world a better place.",
+        "The love you give returns to you in unexpected ways.",
+      ],
+      pride: [
+        "Be proud of who you are and all you've accomplished.",
+        "Your uniqueness is your strength. Celebrate it!",
+        "You have every right to stand tall and be proud of yourself.",
+      ],
       happy: [
         "Your joy is contagious. Keep spreading it!",
         "Happiness looks beautiful on you.",
@@ -512,6 +566,18 @@ export default function VoiceJournal() {
         <div
           className={`absolute top-1/3 right-1/3 w-24 h-24 ${emotionProps.squareColor} opacity-20 rotate-12 ${emotionProps.animationSpeed} delay-75`}
         />
+        {currentEmotion === "love" && (
+          <>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="love-heart"></div>
+            </div>
+            <div className="absolute top-1/4 left-1/3 love-heart scale-50 opacity-30"></div>
+            <div className="absolute bottom-1/4 right-1/3 love-heart scale-75 opacity-40"></div>
+          </>
+        )}
+
+        {/* Special animations for pride */}
+        {currentEmotion === "pride" && <div className="pride-rainbow absolute inset-x-0 top-10 h-40 opacity-30"></div>}
       </div>
 
       <header className="p-4 border-b">
